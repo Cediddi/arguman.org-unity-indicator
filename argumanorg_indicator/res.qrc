@@ -1,0 +1,6 @@
+<!DOCTYPE RCC><RCC version="1.0">
+    <qresource prefix="/">
+        <file>arguman.png</file>
+        <file>arguman_b.png</file>
+    </qresource>
+</RCC>
