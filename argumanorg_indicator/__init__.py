@@ -1,115 +1,118 @@
 #!/usr/bin/python
 #  -*- coding: utf-8 -*-
 
-try:
-    import appindicator
-except ImportError:
-    import appindicator_replacement as appindicator
-from appindicator_replacement import get_icon_filename
-
 import os
 from os import path
 import webbrowser
-import gtk
-import gobject
 import appdirs
 import requests
+import sys
+try:
+    from PyQt4 import QtGui
+    from PyQt4 import QtCore
+except ImportError:
+    print "\n".join((
+        "PyQt4 is missing.",
+        "  For linux, you should be able to install python-qt4 package.",
+        "  For mac, you can install py-pyqt4 package with macports.",
+        "  For windows, you can install from the official website of PyQt4",
+        "    http://www.riverbankcomputing.com/software/pyqt/download"))
+    exit(1)
+import res_rc
 
 
-update_time = 11000
+app = QtGui.QApplication(sys.argv)
 
-icons = [
-    get_icon_filename("arguman.png"),
-    get_icon_filename("arguman_b.png")
+UPDATE_INTERVAL = 11000
+
+ICONS = [
+    QtGui.QIcon(":/arguman.png"),
+    QtGui.QIcon(":/arguman_b.png")
 ]
 
-conf_dir = appdirs.user_config_dir("argumanorg_indicator")
+CONFDIR = appdirs.user_config_dir("argumanorg_indicator")
 
-if not path.exists(conf_dir):
-    if path.exists(conf_dir):
-        os.remove(conf_dir)
-    os.mkdir(conf_dir)
-
-
-def get_current_icon():
-    if not path.exists(path.join(conf_dir, "icon_index")):
-        set_current_icon(0)
-    with open(path.join(conf_dir, "icon_index")) as f:
-        output = f.read()
-    if output.isdigit():
-        return int(output)
-    return 0
+if not path.exists(CONFDIR):
+    if path.exists(CONFDIR):
+        os.remove(CONFDIR)
+    os.mkdir(CONFDIR)
 
 
-def set_current_icon(index):
-    with open(path.join(conf_dir, "icon_index"), "wb") as f:
-        f.write(str(index))
-    return get_current_icon()
+class ArgumanIndicator(QtGui.QSystemTrayIcon):
+    def __init__(self, *__args):
+        super(ArgumanIndicator, self).__init__(*__args)
+        self.icon_index = self.get_icon_index()
+        self.setIcon(ICONS[self.icon_index])
+        self.set_menu()
+        QtCore.QTimer.singleShot(300, self.update_menu)
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.update_menu)
+        self.timer.start(UPDATE_INTERVAL)
 
-current_icon = get_current_icon()
+    def set_menu(self):
+        self.menu = QtGui.QMenu()
 
-indicator = appindicator.Indicator('wallch_indicator',
-                                   icons[current_icon],
-                                   appindicator.CATEGORY_APPLICATION_STATUS)
-indicator.set_status(appindicator.STATUS_ACTIVE)
+        separator = self.menu.addAction("-"*20)
+        separator.setDisabled(True)
+        update_item = self.menu.addAction("Update Now")
+        icon_item = self.menu.addAction("Change Icon")
+        quit_item = self.menu.addAction("Quit")
 
-menu = gtk.Menu()
-seperator = gtk.SeparatorMenuItem()
-update_item = gtk.MenuItem('Update Now')
-icon_item = gtk.MenuItem('Change Icon')
-quit_item = gtk.MenuItem('Quit')
+        update_item.triggered.connect(self.update_menu)
+        icon_item.triggered.connect(self.inverse_icon)
+        quit_item.triggered.connect(QtCore.QCoreApplication.instance().quit)
 
-menu.append(seperator)
-menu.append(update_item)
-menu.append(icon_item)
-menu.append(quit_item)
+        self.setContextMenu(self.menu)
 
-indicator.set_menu(menu)
-seperator.show()
-update_item.show()
-icon_item.show()
-quit_item.show()
+    def inverse_icon(self):
+        self.set_icon_index((self.icon_index+1) % 2)
+        self.setIcon(ICONS[self.icon_index])
+
+    @staticmethod
+    def get_argumans():
+        """Requests last 10 argumans from arguman.org"""
+        response = requests.get("http://arguman.org/api/v1/arguments/",
+                                params={"page_size": 10})
+        return response.json()
+
+    def update_menu(self):
+        from functools import partial
+        _open_web = lambda slug: webbrowser.open("http://arguman.org/"+slug)
+
+        for item in self.menu.actions()[:-4]:
+            self.menu.removeAction(item)
+
+        argumans = self.get_argumans()["results"]
+        actions = []
+        for arguman in argumans:
+            item = self.menu.addAction(u"{title} //{uname}".format(
+                title=arguman["title"], uname=arguman["user"]["username"]))
+            item.triggered.connect(partial(_open_web, arguman["slug"]))
+            actions.append(item)
+
+        self.menu.insertActions(self.menu.actions()[0], actions)
+
+    def get_icon_index(self):
+        """Reads icon index from config file"""
+        if not path.exists(path.join(CONFDIR, "icon_index")):
+            self.set_icon_index(0)
+        with open(path.join(CONFDIR, "icon_index")) as f:
+            output = f.read()
+        if output.isdigit():
+            return int(output)
+        return 0
+
+    def set_icon_index(self, index):
+        """Saves icon index to config file"""
+        with open(path.join(CONFDIR, "icon_index"), "wb") as f:
+            f.write(str(index))
+        self.icon_index = self.get_icon_index()
 
 
-def get_argumans():
-    response = requests.get("http://arguman.org/api/v1/arguments/",
-                            params={"page_size": 10})
-    return response.json()
+def main():
+    arguman_indicator = ArgumanIndicator()
+    arguman_indicator.show()
+    sys.exit(app.exec_())
 
-
-def inverse_icon(item):
-    global current_icon, indicator
-    current_icon = set_current_icon((current_icon+1) % 2)
-    indicator.set_icon(icons[current_icon])
-
-
-def quit_gtk(item):
-    gtk.main_quit()
-
-
-def open_webpage(item, url):
-    webbrowser.open(url)
-
-
-def update(item=None):
-    for item in menu.get_children()[:-4]:
-        menu.remove(item)
-
-    argumans = get_argumans()["results"]
-    argumans.reverse()
-    for arguman in argumans:
-        item = gtk.MenuItem("{title} //{uname}".format(
-            title=arguman["title"], uname=arguman["user"]["username"]))
-        item.connect('activate', open_webpage,
-                     "http://arguman.org/"+arguman["slug"])
-        menu.prepend(item)
-        item.show()
-
-gobject.timeout_add(500, update)
-gobject.timeout_add(update_time, lambda: update() is None)
-
-update_item.connect('activate', update)
-icon_item.connect('activate', inverse_icon)
-quit_item.connect('activate', quit_gtk)
-
-gtk.main()
+if __name__ == '__main__':
+    main()
