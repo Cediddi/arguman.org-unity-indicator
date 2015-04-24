@@ -1,9 +1,16 @@
 # Arguman.org için Ubuntu indikatörü
 
-![kedi](./screenshot_unity.png)
-![kopek](./screenshot_kde.png)
+![Ubuntu 14.04 Unity 7.2](./screenshot_unity.png)
 
+![Kubuntu 15.04 Plasma 5.3](./screenshot_kde.png)
+
+#### Kurulum
 Repo'yu klonladıktan ve setup.py ile kurduktan sonra argumanorg_indicator komutu ile çalıştırabilirsiniz.
-~/.config/autostart klasörüne sembolik bir link oluşturursanız otomatik te başlatabilirsiniz.
+Eğer başlangıçta çalışmasını istiyorsanız işletim sisteminizin başlangıç ayarlarına programı ekleyebilirsiniz.
+
+#### İşletim Sistemleri
+PyQt4 yüklü olduğu sürece win mac linux, gnome unity kde xfce lxde gibi basit ayrımlar yok.
+Windows için XP SP2'den[2004], Mac için Leopard'dan[2005] Linux için 2.6.18 (Debian Sarge)[2006]'den önceki sürümleri kullanmanızı önermiyorum.
+Zaten ne işiniz var 2004 ile? 128Kbit ADSL ile argüman mı okunurmuş?
 
 Geek Kalın.
